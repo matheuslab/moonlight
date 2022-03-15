@@ -1,0 +1,75 @@
+service: moonlight
+
+frameworkVersion: '2'
+variablesResolutionMode: 20210326
+
+plugins:
+  - serverless-plugin-typescript
+
+provider:
+  name: aws
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  runtime: nodejs14.x
+  lambdaHashingVersion: 20201221
+  apiGateway:
+    minimumCompressionSize: 1024
+    shouldStartNameWithService: true
+  iam:
+    role:
+      statements:
+        - Effect: 'Allow'
+          Action:
+            - 'events:PutEvents'
+          Resource: '*'
+        - Effect: 'Allow'
+          Action:
+            - 's3:GetObject'
+            - 's3:PutObject'
+          Resource:
+            - 'arn:aws:s3:::*'
+        - Effect: 'Allow'
+          Action:
+            - 'lambda:InvokeFunction'
+          Resource: '*'
+        - Effect: 'Allow'
+          Action:
+            - 'ssm:*'
+          Resource: '*'
+  environment:
+    STAGE: ${self:provider.stage}
+    NODE_ENV: ${self:provider.stage}
+    HOST: ${self:custom.host}
+    PASSWORD: ${self:custom.password}
+    USERNAME: ${self:custom.username}
+    USERDB: ${self:custom.userdb}
+    SENTRY_DNS: ${self:custom.sentry_dns}
+    SERVICE: ${self:service}
+    LAMBDA_FUNCTION_TIMEOUT: ${self:custom.lambda_timeout}
+    MAX_CONNECTIONS_POOL: ${self:custom.max_connections_pool}
+
+custom:
+  lambda_timeout: 15
+  host: ${ssm:/project/moonlight/${self:provider.stage}/HOST}
+  password: ${ssm:/project/moonlight/${self:provider.stage}/PASSWORD}
+  username: ${ssm:/project/moonlight/${self:provider.stage}/USERNAME}
+  userdb: ${ssm:/project/moonlight/${self:provider.stage}/USERDB}
+  sentry_dns: ${ssm:/project/moonlight/${self:provider.stage}/SENTRY_DNS, ''}
+  max_connections_pool: 1
+
+functions:
+  addUser:
+    handler: src/handlers/addUser.default
+    events:
+      - http:
+          path: /user/
+          method: post
+          request:
+            schemas:
+              application/json:
+                name: AddUser
+                schema: ${file(schemas/add-user.json)}
+
+package:
+  patterns:
+    - '!node_modules/.cache/**'

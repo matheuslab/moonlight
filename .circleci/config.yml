@@ -1,0 +1,45 @@
+version: 2.1
+
+jobs:
+  tests_and_checks:
+    docker:
+      - image: cimg/node:17.0.0
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: npm ci
+      - run:
+          name: Lint
+          command: npm run lint
+      - run:
+          name: Typescript check
+          command: npm run typecheck
+      - run:
+          name: Test with Coverage
+          command: npm run test:coverage
+  deploy:
+    docker:
+      - image: cimg/node:17.0.0
+    steps:
+      - checkout
+      - run:
+          name: Install Serverless CLI and dependencies
+          command: |
+            npm ci
+            sudo npm i -g serverless
+      - run:
+          name: Deploy application
+          command: sls deploy --stage prod --verbose
+
+workflows:
+  build_and_deploy:
+    jobs:
+      - tests_and_checks
+      - deploy:
+          context: aws-credentials
+          requires:
+            - tests_and_checks
+          filters:
+            branches:
+              only: master
